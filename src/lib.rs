@@ -11,6 +11,8 @@ const REG_OUT_TEMP_L: u8 = 0x20;
 const REG_OUTX_L_A: u8 = 0x28;
 
 const WHO_AM_I_VALUE: u8 = 0x6B;
+const CTRL1_ODR_MASK: u8 = 0b1111_0000;
+const CTRL1_FS_MASK: u8 = 0b0000_1100;
 const CTRL3_BDU: u8 = 1 << 6;
 const CTRL3_IF_INC: u8 = 1 << 2;
 const STATUS_XLDA: u8 = 1 << 0;
@@ -50,6 +52,20 @@ impl OutputDataRate {
             Self::Hz833 => 0b0111,
         }
     }
+
+    const fn from_bits(bits: u8) -> Option<Self> {
+        match bits {
+            0b0000 => Some(Self::PowerDown),
+            0b0001 => Some(Self::Hz12_5),
+            0b0010 => Some(Self::Hz26),
+            0b0011 => Some(Self::Hz52),
+            0b0100 => Some(Self::Hz104),
+            0b0101 => Some(Self::Hz208),
+            0b0110 => Some(Self::Hz416),
+            0b0111 => Some(Self::Hz833),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -67,6 +83,16 @@ impl FullScale {
             Self::G3 => 0b01,
             Self::G1 => 0b10,
             Self::G2 => 0b11,
+        }
+    }
+
+    const fn from_bits(bits: u8) -> Self {
+        match bits {
+            0b00 => Self::G0_5,
+            0b01 => Self::G3,
+            0b10 => Self::G1,
+            0b11 => Self::G2,
+            _ => unreachable!(),
         }
     }
 
@@ -149,6 +175,32 @@ where
 
     pub async fn read_who_am_i(&mut self) -> Result<u8, Error<E>> {
         self.read_reg(REG_WHO_AM_I).await
+    }
+
+    pub async fn read_output_data_rate(&mut self) -> Result<Option<OutputDataRate>, Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        Ok(OutputDataRate::from_bits((ctrl1 & CTRL1_ODR_MASK) >> 4))
+    }
+
+    pub async fn write_output_data_rate(&mut self, odr: OutputDataRate) -> Result<(), Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        let updated = (ctrl1 & !CTRL1_ODR_MASK) | (odr.bits() << 4);
+        self.write_reg(REG_CTRL1_XL, updated).await
+    }
+
+    pub async fn read_full_scale(&mut self) -> Result<FullScale, Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        let fs = FullScale::from_bits((ctrl1 & CTRL1_FS_MASK) >> 2);
+        self.fs = fs;
+        Ok(fs)
+    }
+
+    pub async fn write_full_scale(&mut self, fs: FullScale) -> Result<(), Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        let updated = (ctrl1 & !CTRL1_FS_MASK) | (fs.bits() << 2);
+        self.write_reg(REG_CTRL1_XL, updated).await?;
+        self.fs = fs;
+        Ok(())
     }
 
     pub async fn status(&mut self) -> Result<u8, Error<E>> {
@@ -254,6 +306,32 @@ where
 
     pub async fn read_who_am_i(&mut self) -> Result<u8, Error<E>> {
         self.read_reg(REG_WHO_AM_I).await
+    }
+
+    pub async fn read_output_data_rate(&mut self) -> Result<Option<OutputDataRate>, Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        Ok(OutputDataRate::from_bits((ctrl1 & CTRL1_ODR_MASK) >> 4))
+    }
+
+    pub async fn write_output_data_rate(&mut self, odr: OutputDataRate) -> Result<(), Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        let updated = (ctrl1 & !CTRL1_ODR_MASK) | (odr.bits() << 4);
+        self.write_reg(REG_CTRL1_XL, updated).await
+    }
+
+    pub async fn read_full_scale(&mut self) -> Result<FullScale, Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        let fs = FullScale::from_bits((ctrl1 & CTRL1_FS_MASK) >> 2);
+        self.fs = fs;
+        Ok(fs)
+    }
+
+    pub async fn write_full_scale(&mut self, fs: FullScale) -> Result<(), Error<E>> {
+        let ctrl1 = self.read_reg(REG_CTRL1_XL).await?;
+        let updated = (ctrl1 & !CTRL1_FS_MASK) | (fs.bits() << 2);
+        self.write_reg(REG_CTRL1_XL, updated).await?;
+        self.fs = fs;
+        Ok(())
     }
 
     pub async fn status(&mut self) -> Result<u8, Error<E>> {
